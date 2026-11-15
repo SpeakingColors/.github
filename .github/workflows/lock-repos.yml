@@ -1,0 +1,26 @@
+name: lock-repos
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+permissions:
+  actions: write
+  contents: read
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Renew the comment, issue and PR lock on every public repo
+        env:
+          GH_TOKEN: ${{ secrets.LOCK_TOKEN }}
+        run: |
+          fail=0
+          for R in $(gh repo list SpeakingColors --source --no-archived --visibility public -L 200 --json name --jq '.[].name'); do
+            gh api -X PUT repos/SpeakingColors/$R/interaction-limits -f limit=collaborators_only -f expiry=six_months --silent || { echo "failed $R"; fail=1; }
+          done
+          exit $fail
+      - name: Keep this schedule alive
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT repos/${{ github.repository }}/actions/workflows/lock-repos.yml/enable
